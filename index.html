@@ -3,37 +3,323 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>LRC Cleaner By Prem</title>
+<title>LRC Pro Cleaner By Prem</title>
 <style>
   :root{
-    --accent: #00e6a8;
-    --accent-2: #00b3ff;
-    --bg: #000000; /* True black AMOLED */
+    --accent: #FFFFFF;
+    --accent-dark: #000000;
+    --bg: #000000;
     --panel: #0a0a0a;
-    --muted: #9aa3a8;
-    --glass: rgba(255,255,255,0.03);
+    --muted: #888888;
+    --border-color: rgba(255, 255, 255, 0.1);
+    --glass: rgba(255,255,255,0.05);
   }
-  html,body{background:var(--bg); color:#e6eef0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial; height:100%; margin:0;}
+  html,body{background:var(--bg); color:#e6eef0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial; height:100%; margin:0; font-synthesis:none; text-rendering:optimizeLegibility;}
   .app{max-width:980px; margin:0 auto; padding:14px; box-sizing:border-box;}
-  header{display:flex;align-items:center;gap:12px;justify-content:space-between}
-  h1{font-size:18px;margin:0}
-  main{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
-  .row{display:flex;gap:10px;flex-direction:column}
-  .box{background:var(--panel); border-radius:8px; padding:8px;}
-  textarea{width:100%;min-height:180px;background:#030303;color:#e6eef0;border:1px solid rgba(255,255,255,0.03);padding:10px;border-radius:6px;font-family:monospace;font-size:13px;resize:vertical}
-  .btnrow{display:flex;gap:6px;flex-wrap:wrap}
-  button{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--accent);padding:8px 10px;border-radius:8px;font-weight:600;cursor:pointer}
-  button.warn{color:#ffb86b}
-  .tog{display:flex;gap:6px;align-items:center}
-  label{font-size:13px;color:var(--muted)}
-  input[type=checkbox]{width:18px;height:18px}
+  header h1{font-size:22px; margin:0; color: var(--accent);}
+  main{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px}
+  .row{display:flex;gap:14px;flex-direction:column}
+  .box{background:var(--panel); border:1px solid var(--border-color); border-radius:12px; padding:16px; backdrop-filter:blur(12px); background:rgba(10,10,10,0.5); animation:fade-in-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; opacity:0;}
+  .box:nth-child(2) { animation-delay: 0.1s; }
+  .row:nth-child(2) .box:nth-child(1) { animation-delay: 0.2s; }
+  .row:nth-child(2) .box:nth-child(2) { animation-delay: 0.3s; }
+  @keyframes fade-in-up { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+  .box.processing{border-color:var(--accent); box-shadow:0 0 15px rgba(255, 255, 255, 0.2); animation:pulse-glow 1.5s infinite alternate;}
+  @keyframes pulse-glow { from { box-shadow: 0 0 15px rgba(255, 255, 255, 0.2); } to { box-shadow: 0 0 25px rgba(255, 255, 255, 0.3); } }
+  textarea{width:100%;min-height:180px;background:#030303;color:#e6eef0;border:1px solid var(--border-color);padding:10px;border-radius:6px;font-family:monospace;font-size:13px;resize:vertical;transition:all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);}
+  textarea:focus{outline:none; border-color:var(--accent); box-shadow:0 0 10px rgba(255,255,255,0.1);}
+  textarea.drag-over{border-color:var(--accent);}
+  button{background:var(--glass); border:1px solid var(--border-color); color:#e6eef0; padding:8px 14px; border-radius:8px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);}
+  button:hover{border-color:var(--accent); color:var(--accent); transform:translateY(-2px); background:rgba(255,255,255,0.1);}
+  button:active{transform:scale(0.95) translateY(-1px);}
+  button:disabled{cursor:not-allowed; opacity:0.5;}
+  button.primary{background:var(--accent); color:var(--accent-dark); border:none; font-weight:700;}
+  button.primary:hover{box-shadow:0 0 15px rgba(255,255,255,0.2);}
+  .loader{width:14px;height:14px;border:2px solid rgba(0,0,0,0.5);border-bottom-color:transparent;border-radius:50%;display:inline-block;box-sizing:border-box;animation:spin 1s linear infinite;}
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .tog{display:flex; gap:12px; align-items:center; background:var(--glass); padding:8px 10px; border-radius:6px; cursor:pointer; user-select:none; transition: background-color 0.2s;}
+  .tog:hover{background:rgba(255,255,255,0.07);}
+  label{font-size:14px;color:var(--muted);line-height:1;}
+  .custom-checkbox{min-width:18px;width:18px;height:18px;border:2px solid var(--border-color);border-radius:4px;display:inline-block;transition:all .2s ease;}
+  .custom-checkbox::after{content:'';display:block;width:4px;height:8px;border:solid var(--accent-dark);border-width:0 3px 3px 0;transform:rotate(45deg) translate(-2px, -1px);opacity:0;transition:all .2s ease;}
+  input[type=checkbox]{opacity:0;width:0;height:0;position:absolute;}
+  input[type=checkbox]:checked + .custom-checkbox{background-color:var(--accent);border-color:var(--accent);}
+  input[type=checkbox]:checked + .custom-checkbox::after{opacity:1;transform:rotate(45deg) translate(2px, -1px);}
   .small{font-size:12px;color:var(--muted)}
-  .stat{background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:6px;font-size:13px;color:var(--muted)}
-  .preview{background:#050505;padding:8px;border-radius:6px;min-height:120px;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
+  .stat{background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:6px;font-size:13px;color:var(--muted);display:inline-block;}
+  .preview{background:#050505;padding:8px;border-radius:6px;min-height:120px;max-height:240px;overflow:auto;border:1px solid var(--border-color); scroll-behavior:smooth;}
+  .preview-line{padding:3px 4px; border-radius:4px; transition: background-color 0.2s; white-space:pre-wrap;}
   .ts{color:var(--accent);font-weight:700}
+  #toast-container{position:fixed; bottom:20px; right:20px; z-index:1000; display:flex; flex-direction:column; gap:10px;}
+  .toast{padding:12px 20px; border-radius:8px; color:#fff; font-weight:600; box-shadow:0 4px 20px rgba(0,0,0,0.5); opacity:0; transform:translateY(20px); animation:toast-in 0.3s ease forwards;}
+  .toast.success{background:linear-gradient(45deg, #4CAF50, #388E3C);}
+  .toast.error{background:linear-gradient(45deg, #F44336, #D32F2F);}
+  @keyframes toast-in{to{opacity:1; transform:translateY(0);}}
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-track{background:rgba(255,255,255,0.05);}
+  ::-webkit-scrollbar-thumb{background:#333; border-radius:4px;}
+  ::-webkit-scrollbar-thumb:hover{background:#555;}
   @media(min-width:800px){main{grid-template-columns:1fr 1fr}}
 </style>
 </head>
+<body>
+<div class="app">
+  <header><h1>LRC Pro Cleaner</h1></header>
+
+  <main>
+    <section class="row">
+      <div class="box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="small">Input (paste, drop, or open file)</div>
+          <div style="display:flex;gap:4px">
+            <div class="stat" id="linesBefore">Lines: 0</div>
+            <div class="stat" id="wordsBefore">Words: 0</div>
+          </div>
+        </div>
+        <textarea id="input" placeholder="Paste your LRC here or drop a file..."></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <button onclick="selectAllText('input')">Select All</button>
+            <button onclick="copyText('input')">Copy</button>
+            <button onclick="pasteText('input')">Paste</button>
+            <button onclick="loadFile()">Open File</button>
+            <button onclick="clearInput()" class="warn">Clear</button>
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="small" style="font-weight:600; margin-bottom:12px;">Cleanup Options</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label class="tog" for="removeAngle"><input type="checkbox" id="removeAngle" checked/><span class="custom-checkbox"></span> Remove &lt;...&gt; timestamps</label>
+          <label class="tog" for="keepFirstSquare"><input type="checkbox" id="keepFirstSquare" checked/><span class="custom-checkbox"></span> Keep only first [..] per line</label>
+          <label class="tog" for="mergeDupLines"><input type="checkbox" id="mergeDupLines"/><span class="custom-checkbox"></span> Merge duplicate timestamp-only lines</label>
+          <label class="tog" for="capFirst"><input type="checkbox" id="capFirst"/><span class="custom-checkbox"></span> Capitalize first letter</label>
+          <label class="tog" for="removeEmpty"><input type="checkbox" id="removeEmpty" checked/><span class="custom-checkbox"></span> Remove empty lines</label>
+          <label class="tog" for="autoTrim"><input type="checkbox" id="autoTrim" checked/><span class="custom-checkbox"></span> Auto-trim spaces</label>
+          <label class="tog" for="removeAllTS"><input type="checkbox" id="removeAllTS"/><span class="custom-checkbox"></span> Remove all timestamps (only lyrics)</label>
+        </div>
+        <button id="clean-btn" class="primary" onclick="cleanAll()" style="width:100%; justify-content:center; margin-top:12px;">Clean</button>
+      </div>
+    </section>
+
+    <section class="row">
+      <div class="box" id="output-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="small">Output</div>
+          <div style="display:flex;gap:4px">
+            <div class="stat" id="linesAfter">Lines: 0</div>
+            <div class="stat" id="wordsAfter">Words: 0</div>
+          </div>
+        </div>
+        <textarea id="output" placeholder="Cleaned LRC appears here..." readonly></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+          <button onclick="selectAllText('output')">Select All</button>
+          <button onclick="copyText('output')">Copy</button>
+          <button onclick="downloadOutput()">Download .lrc</button>
+        </div>
+      </div>
+
+      <div class="box">
+        <div class="small" style="font-weight:600; margin-bottom:12px;">Live Preview</div>
+        <div id="preview" class="preview"></div>
+      </div>
+    </section>
+  </main>
+  <div id="toast-container"></div>
+</div>
+
+<script>
+function showToast(message, type = 'info', duration = 3000) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+function selectAllText(id){const t=document.getElementById(id);t.focus();t.select();}
+
+function copyText(id) {
+    const element = document.getElementById(id);
+    const textToCopy = element.value;
+    if (!textToCopy) { return; }
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(textToCopy)
+            .then(() => showToast('Copied!', 'success'))
+            .catch(err => copyFallback(element));
+    } else {
+        copyFallback(element);
+    }
+}
+
+function copyFallback(element) {
+    const isReadonly = element.readOnly;
+    element.readOnly = false;
+    element.select();
+    element.setSelectionRange(0, 99999);
+    try {
+        document.execCommand('copy');
+        showToast('Copied!', 'success');
+    } catch (err) {
+        // Fails silently as requested.
+    } finally {
+        element.readOnly = isReadonly;
+        if (window.getSelection) { window.getSelection().removeAllRanges(); }
+    }
+}
+
+async function pasteText(id){try{const text=await navigator.clipboard.readText();document.getElementById(id).value=text;updateStats();previewHighlighted();}catch(e){showToast('Paste failed. Check browser permissions.', 'error');}}
+function clearInput(){document.getElementById('input').value='';document.getElementById('output').value='';updateStats();previewHighlighted();}
+function loadFile(){const f=document.createElement('input');f.type='file';f.accept='.lrc,.txt';f.onchange=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{document.getElementById('input').value=ev.target.result;updateStats();previewHighlighted();};reader.readAsText(file);};f.click();}
+function downloadOutput(){const text=document.getElementById('output').value;if(!text)return showToast('Nothing to download.', 'error');const blob=new Blob([text],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='cleaned.lrc';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}
+
+const workerScript = `
+  self.onmessage = function(event) {
+    const { text, options } = event.data;
+    let inp = text.split('\\n');
+    let outLines = [];
+    for (let line of inp) {
+      if (options.autoTrim) line = line.trim();
+      if (options.removeAngle) line = line.replace(/<\\d{2}:\\d{2}\\.\\d{2,3}>/g, '');
+      if (options.keepFirstSquare && !options.removeAllTS) {
+        const matches = line.match(/\\[\\d{2}:\\d{2}\\.\\d{2,3}\\]/g);
+        if (matches && matches.length > 1) {
+          line = matches[0] + line.replace(/\\[\\d{2}:\\d{2}\\.\\d{2,3}\\]/g, '');
+        }
+      }
+      if (options.removeAllTS) {
+        line = line.replace(/(<|\\[)\\d{2}:\\d{2}\\.\\d{2,3}(\\]|>)/g, '');
+      }
+      if (options.capFirst) {
+        const firstCharMatch = line.match(/(\\S)/);
+        if (firstCharMatch) {
+          const index = firstCharMatch.index;
+          line = line.substring(0, index) + line.charAt(index).toUpperCase() + line.substring(index + 1);
+        }
+      }
+      if (options.removeEmpty && line.replace(/\\[.*?\\]/g, '').trim() === '') continue;
+      outLines.push(line);
+    }
+    if (options.mergeDupLines) {
+        const merged = outLines.reduce((acc, curr) => {
+            const last = acc[acc.length - 1];
+            const currText = curr.replace(/\\[.*?\\]/g, '').trim();
+            const lastText = last ? last.replace(/\\[.*?\\]/g, '').trim() : null;
+            if (currText && currText === lastText) {} 
+            else { acc.push(curr); }
+            return acc;
+        }, []);
+        outLines = merged;
+    }
+    self.postMessage({ text: outLines.join('\\n') });
+  };
+`;
+const workerBlob = new Blob([workerScript], { type: 'application/javascript' });
+const lrcWorker = new Worker(URL.createObjectURL(workerBlob));
+
+lrcWorker.onmessage = function(event) {
+  document.getElementById('output').value = event.data.text;
+  updateStats();
+  previewHighlighted();
+  const cleanBtn = document.getElementById('clean-btn');
+  cleanBtn.disabled = false;
+  cleanBtn.innerHTML = 'Clean';
+  document.getElementById('output-box').classList.remove('processing');
+};
+
+function getOptions() {
+  return {
+    removeAngle: document.getElementById('removeAngle').checked,
+    keepFirstSquare: document.getElementById('keepFirstSquare').checked,
+    mergeDupLines: document.getElementById('mergeDupLines').checked,
+    capFirst: document.getElementById('capFirst').checked,
+    removeEmpty: document.getElementById('removeEmpty').checked,
+    autoTrim: document.getElementById('autoTrim').checked,
+    removeAllTS: document.getElementById('removeAllTS').checked
+  };
+}
+
+function cleanAll() {
+  const cleanBtn = document.getElementById('clean-btn');
+  if(cleanBtn.disabled) return;
+  cleanBtn.disabled = true;
+  cleanBtn.innerHTML = '<span class="loader"></span>Processing...';
+  document.getElementById('output-box').classList.add('processing');
+  
+  lrcWorker.postMessage({
+    text: document.getElementById('input').value,
+    options: getOptions()
+  });
+}
+
+const inputTextarea = document.getElementById('input');
+inputTextarea.addEventListener('dragover', e => { e.preventDefault(); inputTextarea.classList.add('drag-over'); });
+inputTextarea.addEventListener('dragleave', () => inputTextarea.classList.remove('drag-over'));
+inputTextarea.addEventListener('drop', e => {
+  e.preventDefault();
+  inputTextarea.classList.remove('drag-over');
+  if (e.dataTransfer.files.length > 0) {
+    const file = e.dataTransfer.files[0];
+    const reader = new FileReader();
+    reader.onload = ev => { inputTextarea.value = ev.target.result; updateStats(); previewHighlighted(); };
+    reader.readAsText(file);
+  }
+});
+
+function previewHighlighted() {
+  const text = document.getElementById('output').value || document.getElementById('input').value;
+  const preview = document.getElementById('preview');
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  preview.innerHTML = text.split('\n').map(l => 
+    `<div class="preview-line">${esc(l).replace(/(\[\d{2}:\d{2}\.\d{2,3}\])/g, '<span class="ts">$1</span>')}</div>`
+  ).join('');
+}
+
+function updateStats() {
+    function animateCount(spanElement, end) {
+        const start = parseInt(spanElement.textContent) || 0;
+        if (start === end) return;
+        let startTimestamp = null;
+        const duration = 300;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            spanElement.textContent = Math.floor(progress * (end - start) + start);
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            }
+        };
+        window.requestAnimationFrame(step);
+    }
+
+    const inp = document.getElementById('input').value;
+    const out = document.getElementById('output').value;
+    
+    animateCount(document.querySelector('#linesBefore span'), inp ? inp.split('\n').length : 0);
+    animateCount(document.querySelector('#wordsBefore span'), inp.trim() ? inp.trim().split(/\s+/).length : 0);
+    animateCount(document.querySelector('#linesAfter span'), out ? out.split('\n').filter(l => l.trim() !== '').length : 0);
+    animateCount(document.querySelector('#wordsAfter span'), out.trim() ? out.trim().split(/\s+/).length : 0);
+}
+
+function setupStatElements() {
+    ['linesBefore', 'wordsBefore', 'linesAfter', 'wordsAfter'].forEach(id => {
+        const el = document.getElementById(id);
+        const label = el.textContent.split(':')[0];
+        el.innerHTML = `${label}: <span>0</span>`;
+    });
+}
+
+document.getElementById('input').addEventListener('input', () => { updateStats(); previewHighlighted(); });
+
+setupStatElements();
+updateStats();
+</script>
+</body>
+</html>
 <body>
 <div class="app">
   <header>
