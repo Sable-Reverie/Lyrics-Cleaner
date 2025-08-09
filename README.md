@@ -1,3 +1,6 @@
+# If You Want To Use This Simple Tool You Can Check Description Of This Repo
+
+
 # LRC Cleaner By Prem
 
 A lightweight, offline-capable web tool to clean `.lrc` lyrics files by removing timestamps, extra tags, and unwanted text. Perfect for tidying up lyrics before using them in music players or karaoke apps.
