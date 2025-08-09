@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>LRC Cleaner By Prem</title>
+<style>
+  :root{
+    --accent: #00e6a8;
+    --accent-2: #00b3ff;
+    --bg: #000000; /* True black AMOLED */
+    --panel: #0a0a0a;
+    --muted: #9aa3a8;
+    --glass: rgba(255,255,255,0.03);
+  }
+  html,body{background:var(--bg); color:#e6eef0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial; height:100%; margin:0;}
+  .app{max-width:980px; margin:0 auto; padding:14px; box-sizing:border-box;}
+  header{display:flex;align-items:center;gap:12px;justify-content:space-between}
+  h1{font-size:18px;margin:0}
+  main{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+  .row{display:flex;gap:10px;flex-direction:column}
+  .box{background:var(--panel); border-radius:8px; padding:8px;}
+  textarea{width:100%;min-height:180px;background:#030303;color:#e6eef0;border:1px solid rgba(255,255,255,0.03);padding:10px;border-radius:6px;font-family:monospace;font-size:13px;resize:vertical}
+  .btnrow{display:flex;gap:6px;flex-wrap:wrap}
+  button{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--accent);padding:8px 10px;border-radius:8px;font-weight:600;cursor:pointer}
+  button.warn{color:#ffb86b}
+  .tog{display:flex;gap:6px;align-items:center}
+  label{font-size:13px;color:var(--muted)}
+  input[type=checkbox]{width:18px;height:18px}
+  .small{font-size:12px;color:var(--muted)}
+  .stat{background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:6px;font-size:13px;color:var(--muted)}
+  .preview{background:#050505;padding:8px;border-radius:6px;min-height:120px;overflow:auto;border:1px solid rgba(255,255,255,0.03)}
+  .ts{color:var(--accent);font-weight:700}
+  @media(min-width:800px){main{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>LRC Cleaner By Prem</h1>
+    </div>
+  </header>
+
+  <main>
+    <section class="row">
+      <div class="box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div class="small">Input (paste LRC or open file)</div>
+          <div class="small right">
+            <div class="stat" id="linesBefore">Lines: 0</div>
+            <div class="stat" id="wordsBefore">Words: 0</div>
+          </div>
+        </div>
+        <textarea id="input" placeholder="Paste your LRC here..."></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div class="btnrow">
+            <button onclick="selectAllText('input')">Select All</button>
+            <button onclick="copyText('input')">Copy</button>
+            <button onclick="pasteText('input')">Paste</button>
+            <button onclick="loadFile()">Open File</button>
+            <button onclick="clearInput()" class="warn">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="box" style="margin-top:8px">
+        <div class="small">Cleanup Options</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <div style="min-width:180px">
+            <label class="small">Timestamp shift</label>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <input id="shiftValue" placeholder="e.g. -1.5 or 00:01.50" style="padding:8px;border-radius:6px;background:#070707;border:1px solid rgba(255,255,255,0.03);color:#ddd;font-size:13px;width:170px" />
+              <button onclick="applyShift()">Apply</button>
+            </div>
+            <div class="small" style="margin-top:6px;color:var(--muted)">Supports both decimal seconds and mm:ss.xx</div>
+          </div>
+
+          <div>
+            <label class="small">Other options</label>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+              <label class="tog"><input type="checkbox" id="removeAngle" checked/> <span style="margin-left:8px">Remove &lt;...&gt; timestamps</span></label>
+              <label class="tog"><input type="checkbox" id="keepFirstSquare" checked/> <span style="margin-left:8px">Keep only first [..] per line</span></label>
+              <label class="tog"><input type="checkbox" id="mergeDupLines"/> <span style="margin-left:8px">Merge duplicate timestamp-only lines</span></label>
+              <label class="tog"><input type="checkbox" id="capFirst"/> <span style="margin-left:8px">Capitalize first letter</span></label>
+              <label class="tog"><input type="checkbox" id="removeEmpty" checked/> <span style="margin-left:8px">Remove empty lines</span></label>
+              <label class="tog"><input type="checkbox" id="autoTrim" checked/> <span style="margin-left:8px">Auto-trim spaces</span></label>
+              <label class="tog"><input type="checkbox" id="removeAllTS"/> <span style="margin-left:8px">Remove all timestamps (only lyrics)</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button class="strong" onclick="cleanAll()">Clean</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="row">
+      <div class="box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div class="small">Output</div>
+          <div class="small right">
+            <div class="stat" id="linesAfter">Lines: 0</div>
+            <div class="stat" id="wordsAfter">Words: 0</div>
+          </div>
+        </div>
+        <textarea id="output" placeholder="Cleaned LRC appears here..."></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button onclick="selectAllText('output')">Select All</button>
+          <button onclick="copyText('output')">Copy</button>
+          <button onclick="pasteText('output')">Paste</button>
+          <button onclick="downloadOutput()">Download .lrc</button>
+        </div>
+        <div style="margin-top:8px">
+          <div class="small">Preview (with highlighted timestamps)</div>
+          <div id="preview" class="preview"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+function selectAllText(id){const t=document.getElementById(id);t.focus();t.select();}
+function copyText(id){const t=document.getElementById(id);t.select();document.execCommand('copy');}
+async function pasteText(id){try{const text=await navigator.clipboard.readText();document.getElementById(id).value=text;updateStats();}catch(e){alert('Paste failed');}}
+function clearInput(){if(confirm('Clear input?')){document.getElementById('input').value='';document.getElementById('output').value='';updateStats();previewHighlighted();}}
+function loadFile(){const f=document.createElement('input');f.type='file';f.accept='.lrc,.txt';f.onchange=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{document.getElementById('input').value=ev.target.result;updateStats();};reader.readAsText(file);};f.click();}
+function downloadOutput(){const text=document.getElementById('output').value;if(!text)return alert('Nothing to download');const blob=new Blob([text],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='cleaned.lrc';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}
+function parseTimestampToSec(ts){if(/^[-+]?[0-9]*\.?[0-9]+$/.test(ts))return parseFloat(ts);const m=ts.match(/^(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?$/);if(m){return parseInt(m[1])*60+parseInt(m[2])+(m[3]?parseFloat('0.'+m[3]):0);}return NaN;}
+function secToBracket(sec){if(sec<0)sec=0;const mm=Math.floor(sec/60);const s=Math.floor(sec%60);const frac=Math.round((sec-Math.floor(sec))*100);return '['+String(mm).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+String(frac).padStart(2,'0')+']';}
+function cleanAll(){
+  const removeAngle=document.getElementById('removeAngle').checked;
+  const keepFirstSquare=document.getElementById('keepFirstSquare').checked;
+  const mergeDupLines=document.getElementById('mergeDupLines').checked;
+  const capFirst=document.getElementById('capFirst').checked;
+  const removeEmpty=document.getElementById('removeEmpty').checked;
+  const autoTrim=document.getElementById('autoTrim').checked;
+  const removeAllTS=document.getElementById('removeAllTS').checked;
+
+  let inp=document.getElementById('input').value.split('\n');
+  let outLines=[];
+
+  for(let line of inp){
+    if(autoTrim)line=line.trim();
+    if(removeAngle)line=line.replace(/<\d{1,2}:\d{2}\.\d{1,3}>/g,'');
+    if(keepFirstSquare&&!removeAllTS){
+      const matches=line.match(/\[\d{1,2}:\d{2}\.\d{1,3}\]/g);
+      if(matches&&matches.length>0){
+        const first=matches[0];
+        line=first+line.replace(/\[\d{1,2}:\d{2}\.\d{1,3}\]/g,'');
+      }
+    }
+    if(removeAllTS){
+      line=line.replace(/<\d{1,2}:\d{2}\.\d{1,3}>/g,'');
+      line=line.replace(/\[\d{1,2}:\d{2}\.\d{1,3}\]/g,'');
+    }
+    if(capFirst){
+      line=line.replace(/^(\[.*?\])?\s*(.*)$/,(m,p,rest)=>{if(!rest)return(p||'')+rest;return(p||'')+rest.charAt(0).toUpperCase()+rest.slice(1);});
+    }
+    if(removeEmpty && line.replace(/\[\d{1,2}:\d{2}\.\d{1,3}\]/g,'').trim()==='')continue;
+    outLines.push(line);
+  }
+
+  if(mergeDupLines){
+    const merged=[];
+    for(let l of outLines){
+      if(merged.length>0&&l.trim()===merged[merged.length-1])continue;
+      merged.push(l);
+    }
+    outLines=merged;
+  }
+
+  document.getElementById('output').value=outLines.join('\n');
+  updateStats();
+  previewHighlighted();
+}
+function applyShift(){
+  const v=document.getElementById('shiftValue').value.trim();
+  const shiftSec=parseTimestampToSec(v);
+  if(isNaN(shiftSec)){alert('Invalid shift value');return;}
+  let text=document.getElementById('input').value;
+  text=text.replace(/<(\d{1,2}:\d{2}\.\d{1,3})>/g,(m,p1)=>secToBracket(parseTimestampToSec(p1)+shiftSec));
+  text=text.replace(/\[(\d{1,2}:\d{2}\.\d{1,3})\]/g,(m,p1)=>secToBracket(parseTimestampToSec(p1)+shiftSec));
+  document.getElementById('input').value=text;
+  updateStats();
+}
+function previewHighlighted(){
+  const out=document.getElementById('output').value||document.getElementById('input').value;
+  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const lines=out.split('\n');
+  document.getElementById('preview').innerHTML=lines.map(l=>{
+    let t=esc(l);
+    t=t.replace(/(\[\d{1,2}:\d{2}\.\d{1,3}\])/g,'<span class="ts">$1</span>');
+    return '<div style="padding:2px 0">'+t+'</div>';
+  }).join('');
+}
+function updateStats(){
+  const inp=document.getElementById('input').value;
+  const out=document.getElementById('output').value;
+  document.getElementById('linesBefore').innerText='Lines: '+(inp?inp.split('\n').length:0);
+  document.getElementById('linesAfter').innerText='Lines: '+(out?out.split('\n').filter(l=>l.trim()!=='').length:0);
+  document.getElementById('wordsBefore').innerText='Words: '+(inp.trim()?inp.trim().split(/\s+/).length:0);
+  document.getElementById('wordsAfter').innerText='Words: '+(out.trim()?out.trim().split(/\s+/).length:0);
+}
+document.getElementById('input').addEventListener('input',()=>updateStats());
+document.getElementById('output').addEventListener('input',()=>{updateStats();previewHighlighted();});
+updateStats();
+</script>
+</body>
+</html>
