@@ -98,6 +98,14 @@
           <label class="tog" for="removeAllTS"><input type="checkbox" id="removeAllTS"/><span class="custom-checkbox"></span> Remove all timestamps (only lyrics)</label>
         </div>
         <button id="clean-btn" class="primary" onclick="cleanAll()" style="width:100%; justify-content:center; margin-top:12px;">Clean</button>
+
+        <!-- Timestamp shift controls (milliseconds) - added without changing UI styles -->
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap;">
+          <input id="shiftMs" type="number" min="0" step="1" placeholder="Milliseconds" style="width:160px;padding:8px;border-radius:8px;border:1px solid var(--border-color);background:transparent;color:inherit;font-weight:600;" value="500" />
+          <button onclick="shiftTimestamps(true)">Increase ⏫</button>
+          <button onclick="shiftTimestamps(false)">Decrease ⏬</button>
+          <div class="small" style="margin-left:6px;">Select ms and click to shift all timestamps in output (if present) or input.</div>
+        </div>
       </div>
     </section>
 
@@ -177,60 +185,6 @@ function clearInput(){document.getElementById('input').value='';document.getElem
 function loadFile(){const f=document.createElement('input');f.type='file';f.accept='.lrc,.txt';f.onchange=e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{document.getElementById('input').value=ev.target.result;updateStats();previewHighlighted();};reader.readAsText(file);};f.click();}
 function downloadOutput(){const text=document.getElementById('output').value;if(!text)return showToast('Nothing to download.', 'error');const blob=new Blob([text],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='cleaned.lrc';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}
 
-const workerScript = `
-  self.onmessage = function(event) {
-    const { text, options } = event.data;
-    let inp = text.split('\\n');
-    let outLines = [];
-    for (let line of inp) {
-      if (options.autoTrim) line = line.trim();
-      if (options.removeAngle) line = line.replace(/<\\d{2}:\\d{2}\\.\\d{2,3}>/g, '');
-      if (options.keepFirstSquare && !options.removeAllTS) {
-        const matches = line.match(/\\[\\d{2}:\\d{2}\\.\\d{2,3}\\]/g);
-        if (matches && matches.length > 1) {
-          line = matches[0] + line.replace(/\\[\\d{2}:\\d{2}\\.\\d{2,3}\\]/g, '');
-        }
-      }
-      if (options.removeAllTS) {
-        line = line.replace(/(<|\\[)\\d{2}:\\d{2}\\.\\d{2,3}(\\]|>)/g, '');
-      }
-      if (options.capFirst) {
-        const firstCharMatch = line.match(/(\\S)/);
-        if (firstCharMatch) {
-          const index = firstCharMatch.index;
-          line = line.substring(0, index) + line.charAt(index).toUpperCase() + line.substring(index + 1);
-        }
-      }
-      if (options.removeEmpty && line.replace(/\\[.*?\\]/g, '').trim() === '') continue;
-      outLines.push(line);
-    }
-    if (options.mergeDupLines) {
-        const merged = outLines.reduce((acc, curr) => {
-            const last = acc[acc.length - 1];
-            const currText = curr.replace(/\\[.*?\\]/g, '').trim();
-            const lastText = last ? last.replace(/\\[.*?\\]/g, '').trim() : null;
-            if (currText && currText === lastText) {} 
-            else { acc.push(curr); }
-            return acc;
-        }, []);
-        outLines = merged;
-    }
-    self.postMessage({ text: outLines.join('\\n') });
-  };
-`;
-const workerBlob = new Blob([workerScript], { type: 'application/javascript' });
-const lrcWorker = new Worker(URL.createObjectURL(workerBlob));
-
-lrcWorker.onmessage = function(event) {
-  document.getElementById('output').value = event.data.text;
-  updateStats();
-  previewHighlighted();
-  const cleanBtn = document.getElementById('clean-btn');
-  cleanBtn.disabled = false;
-  cleanBtn.innerHTML = 'Clean';
-  document.getElementById('output-box').classList.remove('processing');
-};
-
 function getOptions() {
   return {
     removeAngle: document.getElementById('removeAngle').checked,
@@ -243,17 +197,74 @@ function getOptions() {
   };
 }
 
+// Process on main thread (reliable fallback). Mirrors the previous worker logic.
+function processTextMainThread(text, options) {
+  const inp = text.split('\n');
+  const outLines = [];
+  for (let line of inp) {
+    if (options.autoTrim) line = line.trim();
+    if (options.removeAngle) line = line.replace(/<\d{1,2}:\d{2}\.\d{2,3}>/g, '');
+    if (options.keepFirstSquare && !options.removeAllTS) {
+      const matches = line.match(/\[\d{1,2}:\d{2}\.\d{2,3}\]/g);
+      if (matches && matches.length > 1) {
+        line = matches[0] + line.replace(/\[\d{1,2}:\d{2}\.\d{2,3}\]/g, '');
+      }
+    }
+    if (options.removeAllTS) {
+      line = line.replace(/(<|\[)\d{1,2}:\d{2}\.\d{2,3}(\]|>)/g, '');
+    }
+    if (options.capFirst) {
+      const firstCharMatch = line.match(/(\S)/);
+      if (firstCharMatch) {
+        const index = firstCharMatch.index;
+        line = line.substring(0, index) + line.charAt(index).toUpperCase() + line.substring(index + 1);
+      }
+    }
+    if (options.removeEmpty && line.replace(/\[.*?\]/g, '').trim() === '') continue;
+    outLines.push(line);
+  }
+
+  if (options.mergeDupLines) {
+    const merged = outLines.reduce((acc, curr) => {
+      const last = acc[acc.length - 1];
+      const currText = curr.replace(/\[.*?\]/g, '').trim();
+      const lastText = last ? last.replace(/\[.*?\]/g, '').trim() : null;
+      if (currText && currText === lastText) {
+        // skip duplicate
+      } else {
+        acc.push(curr);
+      }
+      return acc;
+    }, []);
+    return merged.join('\n');
+  }
+
+  return outLines.join('\n');
+}
+
 function cleanAll() {
   const cleanBtn = document.getElementById('clean-btn');
   if(cleanBtn.disabled) return;
   cleanBtn.disabled = true;
   cleanBtn.innerHTML = '<span class="loader"></span>Processing...';
   document.getElementById('output-box').classList.add('processing');
-  
-  lrcWorker.postMessage({
-    text: document.getElementById('input').value,
-    options: getOptions()
-  });
+
+  // Small timeout so spinner renders before heavy work
+  setTimeout(() => {
+    try {
+      const cleaned = processTextMainThread(document.getElementById('input').value, getOptions());
+      document.getElementById('output').value = cleaned;
+      updateStats();
+      previewHighlighted();
+      showToast('Clean complete', 'success');
+    } catch (err) {
+      showToast('Processing failed: ' + (err && err.message ? err.message : err), 'error');
+    } finally {
+      cleanBtn.disabled = false;
+      cleanBtn.innerHTML = 'Clean';
+      document.getElementById('output-box').classList.remove('processing');
+    }
+  }, 16);
 }
 
 const inputTextarea = document.getElementById('input');
@@ -275,7 +286,7 @@ function previewHighlighted() {
   const preview = document.getElementById('preview');
   const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   preview.innerHTML = text.split('\n').map(l => 
-    `<div class="preview-line">${esc(l).replace(/(\[\d{2}:\d{2}\.\d{2,3}\])/g, '<span class="ts">$1</span>')}</div>`
+    `<div class="preview-line">${esc(l).replace(/(\[\d{1,2}:\d{2}\.\d{2,3}\])/g, '<span class="ts">$1</span>')}</div>`
   ).join('');
 }
 
@@ -296,8 +307,8 @@ function updateStats() {
         window.requestAnimationFrame(step);
     }
 
-    const inp = document.getElementById('input').value;
-    const out = document.getElementById('output').value;
+    const inp = document.getElementById('input').value || '';
+    const out = document.getElementById('output').value || '';
     
     animateCount(document.querySelector('#linesBefore span'), inp ? inp.split('\n').length : 0);
     animateCount(document.querySelector('#wordsBefore span'), inp.trim() ? inp.trim().split(/\s+/).length : 0);
@@ -317,6 +328,55 @@ document.getElementById('input').addEventListener('input', () => { updateStats()
 
 setupStatElements();
 updateStats();
+
+// ---------- New: timestamp shifting functionality (milliseconds) ----------
+function shiftTimestamps(increase = true) {
+  const val = parseInt(document.getElementById('shiftMs').value, 10);
+  if (isNaN(val) || val === 0) return showToast('Enter a non-zero milliseconds value.', 'error');
+  const delta = increase ? val : -val;
+  const outEl = document.getElementById('output');
+  const inEl = document.getElementById('input');
+  const targetEl = (outEl.value && outEl.value.trim() !== '') ? outEl : inEl;
+  const orig = targetEl.value;
+  if (!orig) return showToast('Nothing to shift.', 'error');
+
+  const shifted = shiftTimestampsInText(orig, delta);
+  targetEl.value = shifted;
+  updateStats();
+  previewHighlighted();
+  showToast(`${increase ? 'Increased' : 'Decreased'} timestamps by ${Math.abs(val)} ms.`, 'success');
+}
+
+function shiftTimestampsInText(text, deltaMs) {
+  // regex captures bracket/angle, minutes, seconds, milliseconds, and closing bracket
+  const tsRegex = /(\[|<)(\d{1,2}):(\d{2})\.(\d{2,3})(\]|>)/g;
+  return text.replace(tsRegex, (match, open, min, sec, ms, close) => {
+    const origMsLen = ms.length;
+    const minutes = parseInt(min, 10);
+    const seconds = parseInt(sec, 10);
+    let msVal = parseInt(ms, 10);
+    // convert to milliseconds (if 2 digits -> centiseconds)
+    if (origMsLen === 2) msVal = msVal * 10;
+    // total in ms
+    let total = (minutes * 60 + seconds) * 1000 + msVal + deltaMs;
+    if (total < 0) total = 0; // clamp to zero
+    const newMin = Math.floor(total / 60000);
+    const newSec = Math.floor((total % 60000) / 1000);
+    const newMsFull = total % 1000; // 0-999
+    let outMsStr;
+    if (origMsLen === 2) {
+      // convert back to 2-digit centiseconds by flooring
+      const centi = Math.floor(newMsFull / 10);
+      outMsStr = String(centi).padStart(2, '0');
+    } else {
+      outMsStr = String(newMsFull).padStart(3, '0');
+    }
+    const mm = String(newMin).padStart(2, '0');
+    const ss = String(newSec).padStart(2, '0');
+    return `${open}${mm}:${ss}.${outMsStr}${close}`;
+  });
+}
+// -----------------------------------------------------------------------
 </script>
 </body>
 </html>
